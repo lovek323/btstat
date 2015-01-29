@@ -2,6 +2,7 @@ package main
 
 import (
     "encoding/json"
+    "errors"
     "fmt"
     "io/ioutil"
     "log"
@@ -12,7 +13,11 @@ import "github.com/fzzy/radix/redis"
 
 type GeoIpClient struct { }
 
-type GeoIpInsights struct {
+type GeoIpError struct {
+    Error string
+}
+
+type GeoIpCity struct {
     City struct {
         Confidence float64 `json:"confidence"`
         GeonameID  float64 `json:"geoname_id"`
@@ -97,12 +102,12 @@ type GeoIpInsights struct {
     } `json:"traits"`
 }
 
-const GEOIP_INSIGHTS_PATTERN = "https://geoip.maxmind.com/geoip/v2.1/insights/%s"
+const GEOIP_CITY_PATTERN = "https://geoip.maxmind.com/geoip/v2.1/city/%s"
 
-func (c GeoIpClient) GetInsights(
+func (c GeoIpClient) GetGeoIpInfo(
     ip string,
     redisClient *redis.Client,
-) GeoIpInsights {
+) (*GeoIpCity, error) {
     config := GetConfig()
 
     reply := redisClient.Cmd(
@@ -111,10 +116,13 @@ func (c GeoIpClient) GetInsights(
     )
 
     if reply.Err != nil {
-        log.Fatalf(
-            "Failed to check whether IP has been recorded: %s\n",
-            reply.Err,
-        )
+        return nil,
+            errors.New(
+                fmt.Sprintf(
+                    "Failed to check whether IP has been recorded: %s\n",
+                    reply.Err,
+                ),
+            )
     }
 
     exists, err := reply.Int()
@@ -125,10 +133,13 @@ func (c GeoIpClient) GetInsights(
         reply := redisClient.Cmd("GET", fmt.Sprintf("ips.%s", ip))
 
         if reply.Err != nil {
-            log.Fatalf(
-                "Failed to get IP info from redis: %s\n",
-                reply.Err,
-            )
+            return nil,
+                errors.New(
+                    fmt.Sprintf(
+                        "Failed to get IP info from redis: %s\n",
+                        reply.Err,
+                    ),
+                )
         }
 
         bytes = []byte(reply.String())
@@ -137,12 +148,18 @@ func (c GeoIpClient) GetInsights(
 
         request, err := http.NewRequest(
             "GET",
-            fmt.Sprintf(GEOIP_INSIGHTS_PATTERN, ip),
+            fmt.Sprintf(GEOIP_CITY_PATTERN, ip),
             nil,
         )
 
         if err != nil {
-            log.Fatalf("Could not create IP insights request: %s\n", err)
+            return nil,
+                errors.New(
+                    fmt.Sprintf(
+                        "Could not create IP info request: %s\n",
+                        err,
+                    ),
+                )
         }
 
         request.SetBasicAuth(config.GeoIp.UserId, config.GeoIp.LicenseKey)
@@ -152,26 +169,53 @@ func (c GeoIpClient) GetInsights(
         response, err := client.Do(request)
 
         if err != nil {
-            log.Fatalf("Could not perform IP insights request: %s\n", err)
+            return nil,
+                errors.New(
+                    fmt.Sprintf(
+                        "Could not perform IP info request: %s",
+                        err,
+                    ),
+                )
         }
 
         bytes, err = ioutil.ReadAll(response.Body)
 
         if err != nil {
-            log.Fatalf("Could not get insights JSON: %s\n", err)
+            return nil,
+                errors.New(fmt.Sprintf("Could not get IP info JSON: %s", err))
         }
 
         redisClient.Cmd("SET", fmt.Sprintf("ips.%s", ip), string(bytes))
     }
 
-    insights := GeoIpInsights{}
+    geoIpError := GeoIpError{}
 
-    err = json.Unmarshal(bytes, &insights)
+    err = json.Unmarshal(bytes, &geoIpError)
 
     if err != nil {
-        log.Fatalf("Could not parse insights JSON: %s\n", string(bytes))
+        return nil,
+            errors.New(fmt.Sprintf("Could not parse IP info JSON: %s", err))
     }
 
-    return insights
+    if geoIpError.Error != "" {
+        return nil,
+            errors.New(
+                fmt.Sprintf(
+                    "Could not get IP info JSON: %s",
+                    geoIpError.Error,
+                ),
+            )
+    }
+
+    ipInfo := GeoIpCity{}
+
+    err = json.Unmarshal(bytes, &ipInfo)
+
+    if err != nil {
+        return nil,
+            errors.New(fmt.Sprintf("Could not parse IP info JSON: %s", err))
+    }
+
+    return &ipInfo, nil
 }
 

@@ -128,13 +128,19 @@ func runDhtForInfoHash(
                 peerIpAndPort := dht.DecodePeerAddress(peer)
                 peerIpAndPortArr := strings.Split(peerIpAndPort, ":")
                 peerIp := peerIpAndPortArr[0]
-                insights := geoIpClient.GetInsights(peerIp, redisClient)
+
+                ipInfo, err := geoIpClient.GetGeoIpInfo(peerIp, redisClient)
+
+                if err != nil {
+                    log.Fatal(err)
+                }
+
                 log.Printf(
                     "Found peer: %s (%s, %s, %s)\n",
                     peerIp,
-                    insights.Country.Names.En,
-                    insights.City.Names.En,
-                    insights.Postal.Code,
+                    ipInfo.Country.Names.En,
+                    ipInfo.City.Names.En,
+                    ipInfo.Postal.Code,
                 )
 
                 reply := redisClient.Cmd(
@@ -164,7 +170,7 @@ func runDhtForInfoHash(
                     redisClient.Cmd(
                         "HINCRBY",
                         fmt.Sprintf("torrent.%s.countries", infoHashStr),
-                        insights.Country.Names.En,
+                        ipInfo.Country.Names.En,
                         1,
                     )
                     redisClient.Cmd(
@@ -172,8 +178,8 @@ func runDhtForInfoHash(
                         fmt.Sprintf("torrent.%s.cities", infoHashStr),
                         fmt.Sprintf(
                             "%s.%s",
-                            insights.Country.Names.En,
-                            insights.City.Names.En,
+                            ipInfo.Country.Names.En,
+                            ipInfo.City.Names.En,
                         ),
                         1,
                     )
@@ -182,8 +188,8 @@ func runDhtForInfoHash(
                         fmt.Sprintf("torrent.%s.postcodes", infoHashStr),
                         fmt.Sprintf(
                             "%s.%s",
-                            insights.Country.Names.En,
-                            insights.Postal.Code,
+                            ipInfo.Country.Names.En,
+                            ipInfo.Postal.Code,
                         ),
                         1,
                     )
@@ -223,7 +229,7 @@ func runDhtForInfoHash(
                     redisClient.Cmd(
                         "HINCRBY",
                         "countries",
-                        insights.Country.Names.En,
+                        ipInfo.Country.Names.En,
                         1,
                     )
 
@@ -232,8 +238,8 @@ func runDhtForInfoHash(
                         "cities",
                         fmt.Sprintf(
                             "%s.%s",
-                            insights.Country.Names.En,
-                            insights.City.Names.En,
+                            ipInfo.Country.Names.En,
+                            ipInfo.City.Names.En,
                         ),
                         1,
                     )
