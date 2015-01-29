@@ -35,3 +35,4 @@ func ParseMagnetUri(uri string) MagnetLink {
 
     return link
 }
+

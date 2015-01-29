@@ -3,47 +3,31 @@ package main
 import (
     "fmt"
     "log"
+    "strconv"
     "strings"
     "sync"
     "time"
 )
 
 import "github.com/nictuku/dht"
+import "github.com/robfig/cron"
+
+const CONCURRENT_GOROUTINES = 1
 
 func main() {
+    // Process kickass torrents hourly delta every half hour
+    c := cron.New()
+    c.AddFunc("@every 30m", ProcessLatestKatEntries)
+    c.Start()
+
+    // Also run once at the start
+    // ProcessLatestKatEntries()
+
+    runDht()
+}
+
+func runDht() {
     geoIpClient := GeoIpClient{}
-
-    /* entries := GetLatestKatEntries()
-
-    for _, entry := range entries {
-        log.Printf("Entry: %s\n", entry.InfoHash)
-
-        redisClient.Cmd("MULTI")
-        redisClient.Cmd("SADD", "torrents", entry.InfoHash)
-
-        redisClient.Cmd(
-            "HSET",
-            fmt.Sprintf("torrent.%s", entry.InfoHash),
-            "title",
-            entry.Title,
-        )
-
-        redisClient.Cmd(
-            "HSET",
-            fmt.Sprintf("torrent.%s", entry.InfoHash),
-            "category",
-            entry.Category,
-        )
-
-        redisClient.Cmd(
-            "HSET",
-            fmt.Sprintf("torrent.%s", entry.InfoHash),
-            "uri",
-            entry.Uri,
-        )
-
-        redisClient.Cmd("EXEC")
-    } */
 
     dhtClient, err := dht.New(nil)
 
@@ -55,41 +39,59 @@ func main() {
 
     var waitGroup sync.WaitGroup
 
-    A:
-    log.Printf("Starting new group\n")
     redisClient := GetRedisClient()
-    for i := 0; i < 100; i++ {
-        result := redisClient.Cmd("SRANDMEMBER", "torrents")
+    A:
+    result := redisClient.Cmd(
+        "ZREVRANGE",
+        "torrents",
+        0,
+        CONCURRENT_GOROUTINES,
+        "WITHSCORES",
+    )
 
-        if result.Err != nil {
-            log.Fatalf("Could not get torrent: %s\n", err)
-        }
+    if result.Err != nil {
+        log.Fatalf("Could not get torrents: %s\n", result.Err)
+    }
 
-        infoHashStr := result.String()
+    infoHashStrings, err := result.List()
 
-        if len(infoHashStr) != 40 {
+    if err != nil {
+        log.Fatalf("Could not get torrents: %s\n", err)
+    }
+
+    infoHashStr := ""
+    infoHashScore := 0.0
+
+    for index, value := range infoHashStrings {
+        if index % 2 == 0 {
+            infoHashStr = value
             continue
         }
-
+        infoHashScore, err = strconv.ParseFloat(value, 64)
+        if err != nil {
+            log.Fatalf("Could not parse float %s: %s\n", value, err)
+        }
         waitGroup.Add(1)
-        go func () {
+        go func (infoHashStr string, infoHashScore float64) {
             defer waitGroup.Done()
 
             runDhtForInfoHash(
                 infoHashStr,
+                infoHashScore,
                 geoIpClient,
                 dhtClient,
             )
-        }()
-
-        time.Sleep(time.Second)
+        }(infoHashStr, infoHashScore)
     }
+
+    time.Sleep(time.Second)
     waitGroup.Wait()
     goto A
 }
 
 func runDhtForInfoHash(
     infoHashStr string,
+    infoHashScore float64,
     geoIpClient GeoIpClient,
     dhtClient *dht.DHT,
 ) {
@@ -110,7 +112,6 @@ func runDhtForInfoHash(
             // Repeat the request until a result appears, querying nodes that
             // haven't been consulted before and finding close-by candidates for
             // the infohash.
-            log.Printf("Asking for peers: %s\n", infoHashStr)
             dhtClient.PeersRequest(string(infoHash), false)
         case infoHashPeers = <-dhtClient.PeersRequestResults:
             break M
@@ -132,7 +133,8 @@ func runDhtForInfoHash(
                 ipInfo, err := geoIpClient.GetGeoIpInfo(peerIp, redisClient)
 
                 if err != nil {
-                    log.Fatal(err)
+                    log.Print(err)
+                    continue
                 }
 
                 log.Printf(
@@ -168,30 +170,30 @@ func runDhtForInfoHash(
                 if isMember == 0 {
                     redisClient.Cmd("MULTI")
                     redisClient.Cmd(
-                        "HINCRBY",
+                        "ZINCRBY",
                         fmt.Sprintf("torrent.%s.countries", infoHashStr),
+                        1.0,
                         ipInfo.Country.Names.En,
-                        1,
                     )
                     redisClient.Cmd(
-                        "HINCRBY",
+                        "ZINCRBY",
                         fmt.Sprintf("torrent.%s.cities", infoHashStr),
+                        1.0,
                         fmt.Sprintf(
                             "%s.%s",
                             ipInfo.Country.Names.En,
                             ipInfo.City.Names.En,
                         ),
-                        1,
                     )
                     redisClient.Cmd(
-                        "HINCRBY",
+                        "ZINCRBY",
                         fmt.Sprintf("torrent.%s.postcodes", infoHashStr),
                         fmt.Sprintf(
                             "%s.%s",
                             ipInfo.Country.Names.En,
                             ipInfo.Postal.Code,
+                        1.0,
                         ),
-                        1,
                     )
                     redisClient.Cmd(
                         "SADD",
@@ -227,21 +229,21 @@ func runDhtForInfoHash(
                     redisClient.Cmd("MULTI")
 
                     redisClient.Cmd(
-                        "HINCRBY",
+                        "ZINCRBY",
                         "countries",
+                        1.0,
                         ipInfo.Country.Names.En,
-                        1,
                     )
 
                     redisClient.Cmd(
-                        "HINCRBY",
+                        "ZINCRBY",
                         "cities",
+                        1.0,
                         fmt.Sprintf(
                             "%s.%s",
                             ipInfo.Country.Names.En,
                             ipInfo.City.Names.En,
                         ),
-                        1,
                     )
 
                     redisClient.Cmd(

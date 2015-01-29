@@ -13,3 +13,4 @@ func GetRedisClient() *redis.Client {
 
     return redisClient
 }
+

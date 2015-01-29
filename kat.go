@@ -3,7 +3,7 @@ package main
 import (
     "bufio"
     "compress/gzip"
-    // "io/ioutil"
+    "fmt"
     "log"
     "net/http"
     "strings"
@@ -64,5 +64,51 @@ func GetLatestKatEntries() []KatEntry {
     }
 
     return entries
+}
+
+func ProcessLatestKatEntries() {
+    entries := GetLatestKatEntries()
+
+    redisClient := GetRedisClient()
+
+    for _, entry := range entries {
+        log.Printf("Entry: %s\n", entry.InfoHash)
+
+        /**
+         * SCORING
+         *
+         * All torrents will start with a score of 1.0. If peers are found when
+         * a torrent is processed, the score will be reduced by 20% (i.e.,
+         * multiplied by 0.8), otherwise the score will be reduced by 50%. Once
+         * the highest score is less than 0.005, the score will be incremented
+         * by 1.0 to avoid eventually running out of precision.
+         */
+
+        redisClient.Cmd("MULTI")
+        redisClient.Cmd("ZADD", "torrents", 1.0, entry.InfoHash)
+
+        redisClient.Cmd(
+            "HSET",
+            fmt.Sprintf("torrent.%s", entry.InfoHash),
+            "title",
+            entry.Title,
+        )
+
+        redisClient.Cmd(
+            "HSET",
+            fmt.Sprintf("torrent.%s", entry.InfoHash),
+            "category",
+            entry.Category,
+        )
+
+        redisClient.Cmd(
+            "HSET",
+            fmt.Sprintf("torrent.%s", entry.InfoHash),
+            "uri",
+            entry.Uri,
+        )
+
+        redisClient.Cmd("EXEC")
+    }
 }
 
