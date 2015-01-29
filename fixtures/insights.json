@@ -1,0 +1,86 @@
+{
+    "city": {
+        "confidence": 36,
+        "geoname_id": 2207754,
+        "names": {
+            "en": "Ultimo"
+        }
+    },
+    "continent": {
+        "code": "OC",
+        "geoname_id": 6255151,
+        "names": {
+            "de": "Ozeanien",
+            "en": "Oceania",
+            "es": "Ocean\u00eda",
+            "fr": "Oc\u00e9anie",
+            "ja": "\u30aa\u30bb\u30a2\u30cb\u30a2",
+            "pt-BR": "Oceania",
+            "ru": "\u041e\u043a\u0435\u0430\u043d\u0438\u044f",
+            "zh-CN": "\u5927\u6d0b\u6d32"
+        }
+    },
+    "country": {
+        "confidence": 89,
+        "geoname_id": 2077456,
+        "iso_code": "AU",
+        "names": {
+            "de": "Australien",
+            "en": "Australia",
+            "es": "Australia",
+            "fr": "Australie",
+            "ja": "\u30aa\u30fc\u30b9\u30c8\u30e9\u30ea\u30a2",
+            "pt-BR": "Austr\u00e1lia",
+            "ru": "\u0410\u0432\u0441\u0442\u0440\u0430\u043b\u0438\u044f",
+            "zh-CN": "\u6fb3\u5927\u5229\u4e9a"
+        }
+    },
+    "location": {
+        "accuracy_radius": 77,
+        "latitude": -33.8786,
+        "longitude": 151.1969,
+        "time_zone": "Australia/Sydney"
+    },
+    "maxmind": {
+        "queries_remaining": 1000
+    },
+    "postal": {
+        "code": "2007",
+        "confidence": 31
+    },
+    "registered_country": {
+        "geoname_id": 2077456,
+        "iso_code": "AU",
+        "names": {
+            "de": "Australien",
+            "en": "Australia",
+            "es": "Australia",
+            "fr": "Australie",
+            "ja": "\u30aa\u30fc\u30b9\u30c8\u30e9\u30ea\u30a2",
+            "pt-BR": "Austr\u00e1lia",
+            "ru": "\u0410\u0432\u0441\u0442\u0440\u0430\u043b\u0438\u044f",
+            "zh-CN": "\u6fb3\u5927\u5229\u4e9a"
+        }
+    },
+    "subdivisions": [
+        {
+            "confidence": 89,
+            "geoname_id": 2155400,
+            "iso_code": "NSW",
+            "names": {
+                "en": "New South Wales",
+                "fr": "Nouvelle-Galles du Sud",
+                "pt-BR": "Nova Gales do Sul",
+                "ru": "\u041d\u043e\u0432\u044b\u0439 \u042e\u0436\u043d\u044b\u0439 \u0423\u044d\u043b\u044c\u0441"
+            }
+        }
+    ],
+    "traits": {
+        "autonomous_system_number": 56270,
+        "autonomous_system_organization": "ROJAN AUSTRALIA",
+        "ip_address": "103.246.233.49",
+        "isp": "Rojan Australia",
+        "organization": "Rojan Australia",
+        "user_type": "business"
+    }
+}
