@@ -181,6 +181,8 @@ func (c GeoIpClient) GetGeoIpInfo(
         bytes, err = ioutil.ReadAll(response.Body)
 
         if err != nil {
+            redisClient.Cmd("DEL", fmt.Sprintf("ips.%s", ip))
+
             return nil,
                 errors.New(fmt.Sprintf("Could not get IP info JSON: %s", err))
         }
