@@ -5,8 +5,9 @@ import (
     "errors"
     "fmt"
     "io/ioutil"
-    "log"
     "net/http"
+    "strconv"
+    "time"
 )
 
 import "github.com/fzzy/radix/redis"
@@ -105,50 +106,30 @@ type GeoIpCity struct {
 const GEOIP_CITY_PATTERN = "https://geoip.maxmind.com/geoip/v2.1/city/%s"
 
 func (c GeoIpClient) GetGeoIpInfo(
-    ip string,
+    ipStr string,
     redisClient *redis.Client,
 ) (*GeoIpCity, error) {
     config := GetConfig()
 
-    reply := redisClient.Cmd(
-        "EXISTS",
-        fmt.Sprintf("ips.%s", ip),
-    )
+    /*
+    IP addresses will be looked up in Maxmind's database at most once per 30
+    days.
 
-    if reply.Err != nil {
-        return nil,
-            errors.New(
-                fmt.Sprintf(
-                    "Failed to check whether IP has been recorded: %s\n",
-                    reply.Err,
-                ),
-            )
-    }
+    `SETEX ips.<ip-address> <time.Hour * 24 * 30> <json-string>`
+    */
 
-    exists, err := reply.Int()
+    exists := RedisIntCmd(redisClient, "EXISTS", fmt.Sprintf("ips.%s", ipStr))
 
     var bytes []byte
 
     if exists == 1 {
-        reply := redisClient.Cmd("GET", fmt.Sprintf("ips.%s", ip))
+        reply := RedisStrCmd(redisClient, "GET", fmt.Sprintf("ips.%s", ipStr))
 
-        if reply.Err != nil {
-            return nil,
-                errors.New(
-                    fmt.Sprintf(
-                        "Failed to get IP info from redis: %s\n",
-                        reply.Err,
-                    ),
-                )
-        }
-
-        bytes = []byte(reply.String())
+        bytes = []byte(reply)
     } else {
-        log.Printf("Requesting info for %s from Maxmind\n", ip)
-
         request, err := http.NewRequest(
             "GET",
-            fmt.Sprintf(GEOIP_CITY_PATTERN, ip),
+            fmt.Sprintf(GEOIP_CITY_PATTERN, ipStr),
             nil,
         )
 
@@ -181,22 +162,33 @@ func (c GeoIpClient) GetGeoIpInfo(
         bytes, err = ioutil.ReadAll(response.Body)
 
         if err != nil {
-            redisClient.Cmd("DEL", fmt.Sprintf("ips.%s", ip))
+            redisClient.Cmd("DEL", fmt.Sprintf("ips.%s", ipStr))
 
             return nil,
                 errors.New(fmt.Sprintf("Could not get IP info JSON: %s", err))
         }
 
-        redisClient.Cmd("SET", fmt.Sprintf("ips.%s", ip), string(bytes))
+        redisClient.Cmd(
+            "SETEX",
+            fmt.Sprintf("ips.%s", ipStr),
+            strconv.FormatInt(int64((time.Hour * 24 * 30).Seconds()), 10),
+            string(bytes),
+        )
     }
 
     geoIpError := GeoIpError{}
 
-    err = json.Unmarshal(bytes, &geoIpError)
+    err := json.Unmarshal(bytes, &geoIpError)
 
     if err != nil {
         return nil,
-            errors.New(fmt.Sprintf("Could not parse IP info JSON: %s", err))
+            errors.New(
+                fmt.Sprintf(
+                    "Could not parse IP info JSON '%s': %s",
+                    string(bytes),
+                    err,
+                ),
+            )
     }
 
     if geoIpError.Error != "" {

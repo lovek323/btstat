@@ -9,6 +9,8 @@ import (
     "strings"
 )
 
+import "github.com/stathat/go"
+
 type KatEntry struct {
     InfoHash string
     Title string
@@ -30,12 +32,6 @@ func GetLatestKatEntries() []KatEntry {
     if err != nil {
         log.Fatalf("Failed to read KAT entries body: %s\n", err)
     }
-
-    /* entries, err := ioutil.ReadAll(reader)
-
-    if err != nil {
-        log.Fatalf("Failed to read KAT entries body: %s\n", err)
-    } */
 
     scanner := bufio.NewScanner(reader)
 
@@ -74,41 +70,47 @@ func ProcessLatestKatEntries() {
     for _, entry := range entries {
         log.Printf("Entry: %s\n", entry.InfoHash)
 
-        /**
-         * SCORING
-         *
-         * All torrents will start with a score of 1.0. If peers are found when
-         * a torrent is processed, the score will be reduced by 20% (i.e.,
-         * multiplied by 0.8), otherwise the score will be reduced by 50%. Once
-         * the highest score is less than 0.005, the score will be incremented
-         * by 1.0 to avoid eventually running out of precision.
-         */
-
         redisClient.Cmd("MULTI")
         redisClient.Cmd("ZADD", "torrents", 1.0, entry.InfoHash)
 
         redisClient.Cmd(
             "HSET",
-            fmt.Sprintf("torrent.%s", entry.InfoHash),
+            fmt.Sprintf("torrents.info.%s", entry.InfoHash),
             "title",
             entry.Title,
         )
 
         redisClient.Cmd(
             "HSET",
-            fmt.Sprintf("torrent.%s", entry.InfoHash),
+            fmt.Sprintf("torrents.info.%s", entry.InfoHash),
             "category",
             entry.Category,
         )
 
         redisClient.Cmd(
             "HSET",
-            fmt.Sprintf("torrent.%s", entry.InfoHash),
+            fmt.Sprintf("torrents.info.%s", entry.InfoHash),
             "uri",
             entry.Uri,
         )
 
         redisClient.Cmd("EXEC")
     }
+
+    torrentCount := RedisIntCmd(
+        redisClient,
+        "ZCOUNT",
+        "torrents",
+        "-inf",
+        "+inf",
+    )
+
+    redisClient.Cmd("SET", "torrents.count", torrentCount)
+
+    stathat.PostEZValue(
+        "torrents.count",
+        "lovek323@gmail.com",
+        float64(torrentCount),
+    )
 }
 
