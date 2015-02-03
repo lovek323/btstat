@@ -26,6 +26,7 @@ func processPeerIp(
         "torrents.<info-hash>.countries.<country-name>.users": false,
         "torrents.<info-hash>.countries.<country-name>.cities.<city-name>.users": false,
         "torrents.<info-hash>.countries.<country-name>.postcodes.<postcode>.users": false,
+        "users": true,
     }
 
     newIp := false
@@ -92,7 +93,7 @@ func registerMetric(
     }
 
     // Set the TTL on the IP address.
-    RedisIntCmd(
+    RedisCmd(
         redisClient,
         "EXPIRE",
         fmt.Sprintf("%s.%s", metric, ipStr),

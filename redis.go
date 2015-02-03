@@ -113,7 +113,7 @@ func RedisCmd(
     redisClient *redis.Client,
     command string,
     args ...string,
-) {
+) *redis.Reply {
     argsIface := make([]interface{}, len(args))
     for index, arg := range args {
         argsIface[index] = interface{}(arg)
@@ -128,5 +128,7 @@ func RedisCmd(
             reply.Err,
         )
     }
+
+    return reply
 }
 

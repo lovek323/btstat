@@ -15,14 +15,14 @@
    torrents with no peers.
 
 4. If 200 or more peers are found (where 200 is the maximum UDP trackers seem to
-   return) and at least some threshold were new (we use 5 for this threshold
-   currently), the score will be increased by 20% (i.e., multiplied by `1.2`) to
-   put it back at the top of the queue.
+   return) and at least some threshold were new (we use 10% of the max peers for
+   this threshold currently), the score will be increased by 20% (i.e.,
+   multiplied by `1.2`) to put it back at the top of the queue.
 
 ### Number of goroutines
 
 If a torrent's score gets below `0.005` (i.e., `0.5^8`, after the ninth time
-with no peers or `0.8^24`, after the twenty-fifth time with fewer than 200
+with no peers or `0.75^18`, after the nineteenth time with fewer than 200
 peers), it will be removed. This will hopefully help keep the number of torrents
 we're tracking at a manageable level.
 

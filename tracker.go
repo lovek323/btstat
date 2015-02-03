@@ -157,7 +157,7 @@ func scrapeUdpTracker(
     defer func() { conn.Close() }()
 
     var connectionID uint64
-    err = conn.SetDeadline(time.Now().Add(2 * time.Second))
+    err = conn.SetDeadline(time.Now().Add(UDP_TIMEOUT * time.Second))
     if err != nil {
         return nil, err
     }
@@ -426,9 +426,17 @@ func runTracker() {
             defer waitGroup.Done()
 
             trackerUrlStrs := map[string]int{
-                "udp://open.demonii.com:1337/announce": 200,
-                "udp://tracker.leechers-paradise.org:6969/announce": 200,
+                "udp://12.rarbg.me:80/announce": 200,
                 "udp://9.rarbg.com:2710/announce": 50,
+                "udp://open.demonii.com:1337/announce": 200,
+                "udp://tracker.coppersurfer.tk:6969/announce": 200,
+                "udp://tracker.leechers-paradise.org:6969/announce": 200,
+                "udp://tracker.token.ro:80/announce": 200,
+
+                // Not working:
+                // "udp://tracker.openbittorrent.com:80": 200,
+                // "udp://tracker.publicbt.com:80": 200,
+                // "udp://tracker.istole.it:80": 200,
             }
 
             // If a list of trackers doesn't exist (or it is empty) for
@@ -474,9 +482,29 @@ func runTracker() {
                 )
             }
 
-            redisClient.Cmd("INCR", "torrents.processed")
+            if RedisCmd(
+                redisClient,
+                "GET",
+                fmt.Sprintf("torrents.%s.processed", infoHashStr),
+            ).Type == redis.NilReply {
+                // log.Printf("Marking torrent as processed: %s\n", infoHashStr)
 
-            stathat.PostEZCount("torrents.processed", "lovek323@gmail.com", 1)
+                RedisCmd(
+                    redisClient,
+                    "SETEX",
+                    fmt.Sprintf("torrents.%s.processed", infoHashStr),
+                    strconv.FormatInt(int64(time.Hour.Seconds()), 10),
+                    time.Now().Format("2006-01-02 15:04:05"),
+                )
+
+                // This torrent has already been recorded as being processed
+                // within the last hour.
+                stathat.PostEZCount(
+                    "torrents.processed",
+                    "lovek323@gmail.com",
+                    1,
+                )
+            }
         }(infoHashStr, infoHashScore)
     }
 
@@ -496,7 +524,7 @@ func runTrackerForInfoHash(
     response, err := queryTracker(infoHashStr, trackerUrlStr)
 
     if err != nil {
-        log.Printf("Could not query UDP tracker '%s': %s\n", trackerUrlStr, err)
+        // log.Printf("Could not query UDP tracker '%s': %s\n", trackerUrlStr, err)
         stathat.PostEZCount("errors.query-udp-tracker", "lovek323@gmail.com", 1)
         RedisCmd(
             redisClient,
@@ -504,7 +532,7 @@ func runTrackerForInfoHash(
             fmt.Sprintf("torrents.%s.trackers", infoHashStr),
             trackerUrlStr,
         )
-        updateInfoHashScore(infoHashStr, infoHashScore * 0.8, redisClient)
+        updateInfoHashScore(infoHashStr, infoHashScore * 0.5, redisClient)
         return
     }
 
@@ -527,7 +555,12 @@ func runTrackerForInfoHash(
 
         var newInfoHashScore float64
 
-        if len(peers) >= trackerMaxPeerCount && newPeers > 5 {
+        peerThreshold := int(
+            float64(trackerMaxPeerCount) * float64(TORRENT_MAX_PEER_THRESHOLD),
+        )
+
+        if len(peers) >= trackerMaxPeerCount &&
+            newPeers > peerThreshold {
             newInfoHashScore = infoHashScore * 1.2
         } else {
             RedisCmd(
@@ -537,20 +570,22 @@ func runTrackerForInfoHash(
                 trackerUrlStr,
             )
 
-            newInfoHashScore = infoHashScore * 0.8
+            newInfoHashScore = infoHashScore * 0.75
         }
 
         updateInfoHashScore(infoHashStr, newInfoHashScore, redisClient)
 
-        log.Printf(
-            "P: %03d (%03d) H: %s S: %f (%f) T: %s\n",
-            len(peers) / peerLen,
-            newPeers,
-            infoHashStr,
-            infoHashScore,
-            newInfoHashScore,
-            trackerUrlStr,
-        )
+        if (newPeers > 0) {
+            log.Printf(
+                "P: %03d (%03d) H: %s S: %e (%e) T: %s\n",
+                len(peers) / peerLen,
+                newPeers,
+                infoHashStr,
+                infoHashScore,
+                newInfoHashScore,
+                trackerUrlStr,
+            )
+        }
     } else {
         RedisCmd(
             redisClient,
