@@ -5,6 +5,7 @@ import (
     "errors"
     "fmt"
     "io/ioutil"
+    "log"
     "net/http"
     "strconv"
     "time"
@@ -104,6 +105,54 @@ type GeoIpCity struct {
 }
 
 type GeoIpCountry struct {
+	Continent struct {
+		Code      string  `json:"code"`
+			GeonameID float64 `json:"geoname_id"`
+			Names     struct {
+				De    string `json:"de"`
+					En    string `json:"en"`
+					Es    string `json:"es"`
+					Fr    string `json:"fr"`
+					Ja    string `json:"ja"`
+					Pt_BR string `json:"pt-BR"`
+					Ru    string `json:"ru"`
+					Zh_CN string `json:"zh-CN"`
+			} `json:"names"`
+	} `json:"continent"`
+	Country struct {
+		GeonameID float64 `json:"geoname_id"`
+			IsoCode   string  `json:"iso_code"`
+			Names     struct {
+				De    string `json:"de"`
+					En    string `json:"en"`
+					Es    string `json:"es"`
+					Fr    string `json:"fr"`
+					Ja    string `json:"ja"`
+					Pt_BR string `json:"pt-BR"`
+					Ru    string `json:"ru"`
+					Zh_CN string `json:"zh-CN"`
+			} `json:"names"`
+	} `json:"country"`
+	Maxmind struct {
+		QueriesRemaining float64 `json:"queries_remaining"`
+	} `json:"maxmind"`
+	RegisteredCountry struct {
+		GeonameID float64 `json:"geoname_id"`
+			IsoCode   string  `json:"iso_code"`
+			Names     struct {
+				De    string `json:"de"`
+					En    string `json:"en"`
+					Es    string `json:"es"`
+					Fr    string `json:"fr"`
+					Ja    string `json:"ja"`
+					Pt_BR string `json:"pt-BR"`
+					Ru    string `json:"ru"`
+					Zh_CN string `json:"zh-CN"`
+			} `json:"names"`
+	} `json:"registered_country"`
+	Traits struct {
+		IpAddress string `json:"ip_address"`
+	} `json:"traits"`
 }
 
 const GEOIP_CITY_PATTERN    = "https://geoip.maxmind.com/geoip/v2.1/city/%s"
@@ -112,7 +161,7 @@ const GEOIP_COUNTRY_PATTERN = "https://geoip.maxmind.com/geoip/v2.1/country/%s"
 func (c GeoIpClient) GetGeoIpInfo(
     ipStr string,
     redisClient *redis.Client,
-) (*GeoIpCity, error) {
+) (*GeoIpCountry, error) {
     config := GetConfig()
 
     /*
@@ -133,7 +182,7 @@ func (c GeoIpClient) GetGeoIpInfo(
     } else {
         request, err := http.NewRequest(
             "GET",
-            fmt.Sprintf(GEOIP_CITY_PATTERN, ipStr),
+            fmt.Sprintf(GEOIP_COUNTRY_PATTERN, ipStr),
             nil,
         )
 
@@ -196,16 +245,16 @@ func (c GeoIpClient) GetGeoIpInfo(
     }
 
     if geoIpError.Error != "" {
-        return nil,
-            errors.New(
-                fmt.Sprintf(
-                    "Could not get IP info JSON: %s",
-                    geoIpError.Error,
-                ),
-            )
+        if exists == 1 {
+            RedisCmd(redisClient, "DEL", fmt.Sprintf("ips.%s", ipStr))
+	} else {
+            log.Fatalf(geoIpError.Error)
+        }
+
+        return nil, errors.New(geoIpError.Error)
     }
 
-    ipInfo := GeoIpCity{}
+    ipInfo := GeoIpCountry{}
 
     err = json.Unmarshal(bytes, &ipInfo)
 
