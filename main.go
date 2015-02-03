@@ -11,8 +11,8 @@ import (
     "strings"
 )
 
-const CONCURRENT_GOROUTINES      = 4
-const TORRENT_MAX_PEER_THRESHOLD = 0.15 // 15% of max peers
+const CONCURRENT_GOROUTINES      = 20
+const TORRENT_MAX_PEER_THRESHOLD = 0.05 // 5% of max peers
 const UDP_TIMEOUT                = 1 // Wait 1 second to send/receive UDP data
 
 func main() {
@@ -41,8 +41,6 @@ func main() {
     c := cron.New()
     c.AddFunc("@every 30m", ProcessLatestKatEntries)
     c.Start()
-
-    // runDht()
 
     runTracker()
 }

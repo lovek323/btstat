@@ -103,7 +103,11 @@ type GeoIpCity struct {
     } `json:"traits"`
 }
 
-const GEOIP_CITY_PATTERN = "https://geoip.maxmind.com/geoip/v2.1/city/%s"
+type GeoIpCountry struct {
+}
+
+const GEOIP_CITY_PATTERN    = "https://geoip.maxmind.com/geoip/v2.1/city/%s"
+const GEOIP_COUNTRY_PATTERN = "https://geoip.maxmind.com/geoip/v2.1/country/%s"
 
 func (c GeoIpClient) GetGeoIpInfo(
     ipStr string,

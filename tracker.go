@@ -524,6 +524,7 @@ func runTrackerForInfoHash(
     response, err := queryTracker(infoHashStr, trackerUrlStr)
 
     if err != nil {
+        // No need to log this since we record it on StatHat:
         // log.Printf("Could not query UDP tracker '%s': %s\n", trackerUrlStr, err)
         stathat.PostEZCount("errors.query-udp-tracker", "lovek323@gmail.com", 1)
         RedisCmd(
@@ -544,11 +545,11 @@ func runTrackerForInfoHash(
         newPeers := 0
 
         for i := 0; i < len(peers); i += peerLen {
-            peerIpAndPort := nettools.BinaryToDottedPort(peers[i : i+peerLen])
-            peerIpAndPortArr := strings.Split(peerIpAndPort, ":")
-            peerIp := peerIpAndPortArr[0]
+            ipPortStr := nettools.BinaryToDottedPort(peers[i : i+peerLen])
+            ipPortArr := strings.Split(ipPortStr, ":")
+            ipStr := ipPortArr[0]
 
-            if processPeerIp(peerIp, infoHashStr, redisClient) {
+            if processPeerIp(ipStr, infoHashStr, redisClient) {
                 newPeers++
             }
         }
@@ -559,8 +560,11 @@ func runTrackerForInfoHash(
             float64(trackerMaxPeerCount) * float64(TORRENT_MAX_PEER_THRESHOLD),
         )
 
-        if len(peers) >= trackerMaxPeerCount &&
-            newPeers > peerThreshold {
+        peerCount := len(peers) / peerLen
+        hasMaxPeers := peerCount >= trackerMaxPeerCount
+        hasEnoughNewPeers := newPeers > peerThreshold
+
+        if hasMaxPeers && hasEnoughNewPeers {
             newInfoHashScore = infoHashScore * 1.2
         } else {
             RedisCmd(
@@ -570,7 +574,7 @@ func runTrackerForInfoHash(
                 trackerUrlStr,
             )
 
-            newInfoHashScore = infoHashScore * 0.75
+            newInfoHashScore = infoHashScore * 0.8
         }
 
         updateInfoHashScore(infoHashStr, newInfoHashScore, redisClient)
@@ -578,7 +582,7 @@ func runTrackerForInfoHash(
         if (newPeers > 0) {
             log.Printf(
                 "P: %03d (%03d) H: %s S: %e (%e) T: %s\n",
-                len(peers) / peerLen,
+                peerCount,
                 newPeers,
                 infoHashStr,
                 infoHashScore,
