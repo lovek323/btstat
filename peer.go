@@ -2,7 +2,6 @@ package main
 
 import (
     "fmt"
-    "log"
     "strconv"
     "strings"
     "time"
@@ -63,7 +62,8 @@ func registerMetric(
     ipInfo, err := geoIpClient.GetGeoIpInfo(ipStr, redisClient)
 
     if err != nil {
-        log.Fatalf("Could not get IP info: %s\n", err)
+        stathat.PostEZCount("errors.maxmind-geoip", "lovek323@gmail.com", 1)
+        return false
     }
 
     metric = strings.Replace(
