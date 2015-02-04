@@ -1,3 +1,4 @@
+*.mmdb
+*.mmdb.gz
 config.json
 dump.rdb
-*.mmdb.gz
