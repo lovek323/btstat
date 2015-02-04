@@ -69,7 +69,7 @@ func (i *Infohash) Process(redisClient *redis.Client) {
 		// This torrent has already been recorded as being processed
 		// within the last hour.
 		app.GetTorrentRateCounter().Incr(1)
-		go stathat.PostEZCount("torrents.processed", "lovek323@gmail.com", 1)
+		stathat.PostEZCount("torrents.processed", "lovek323@gmail.com", 1)
 	}
 }
 

@@ -346,7 +346,7 @@ func (t *tracker) Process(infohash *Infohash, redisClient *redis.Client) {
 	response, err := t.query(infohash.String())
 	if err != nil {
 		app.Debugf("Tracker.Process()", "Error querying %s: %s", infohash.GetTracker().GetURL().String(), err)
-		go stathat.PostEZCount("errors.query-udp-tracker", "lovek323@gmail.com", 1)
+		stathat.PostEZCount("errors.query-udp-tracker", "lovek323@gmail.com", 1)
 		RedisCmd(
 			redisClient,
 			"SREM",

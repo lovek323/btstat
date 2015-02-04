@@ -47,8 +47,8 @@ func ParsePeers(peersStr string) ([]*Peer, error) {
 func (p *Peer) Process(infohash *Infohash, redisClient *redis.Client) bool {
 	start := time.Now()
 	metrics := []*Metric{
-		NewMetric("countries.users.sorted", STATS_HAT_YES, "<country-name>"),
-		NewMetric("countries.<country-name>.users", STATS_HAT_NO, SORTED_SET_NO),
+		NewMetric("countries.users.sorted", STATS_HAT_NO, "<country-name>"),
+		NewMetric("countries.<country-name>.users", STATS_HAT_YES, SORTED_SET_NO),
 		NewMetric("torrents.users.sorted", STATS_HAT_NO, "<infohash>"),
 		NewMetric("torrents.<infohash>.users", STATS_HAT_NO, SORTED_SET_NO),
 		NewMetric("torrents.<infohash>.countries.<country-name>.users", STATS_HAT_NO, SORTED_SET_NO),
@@ -64,7 +64,7 @@ func (p *Peer) Process(infohash *Infohash, redisClient *redis.Client) bool {
 		}
 	}
 	elapsed := time.Since(start)
-	go stathat.PostEZValue("timings.Peer.Process", "lovek323@gmail.com", elapsed.Seconds())
+	stathat.PostEZValue("timings.Peer.Process", "lovek323@gmail.com", elapsed.Seconds())
 	return newIp
 }
 

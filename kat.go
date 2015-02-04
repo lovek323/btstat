@@ -92,5 +92,5 @@ func ProcessLatestKatEntries() {
 		"+inf",
 	)
 	redisClient.Cmd("SET", "torrents.count", torrentCount)
-	go stathat.PostEZValue("torrents.count", "lovek323@gmail.com", float64(torrentCount))
+	stathat.PostEZValue("torrents.count", "lovek323@gmail.com", float64(torrentCount))
 }

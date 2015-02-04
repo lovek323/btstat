@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const CONCURRENT_GOROUTINES = 60        // Run 20 torrents at a time
+const CONCURRENT_GOROUTINES = 20        // Run 20 torrents at a time
 const TORRENT_MAX_PEER_THRESHOLD = 0.15 // 15% of max peers
 const UDP_TIMEOUT = 1                   // Wait 1 second to send/receive UDP data
 

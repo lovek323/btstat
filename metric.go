@@ -114,7 +114,8 @@ func (m *Metric) Register(
 
 		// Record the global metric in StatHat.
 		if m.storeInStatHat {
-			go stathat.PostEZCount(metricStr, "lovek323@gmail.com", 1)
+			app.Debugf("Metric.Register()", metricStr)
+			stathat.PostEZCount(metricStr, "lovek323@gmail.com", 1)
 		}
 	}
 
