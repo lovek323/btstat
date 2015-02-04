@@ -3,14 +3,18 @@ package main
 import (
 	"log"
 	"strconv"
+	"time"
 )
 
 import "github.com/fzzy/radix/redis"
 import "github.com/getlantern/golog"
+import "github.com/paulbellamy/ratecounter"
 
 type App struct {
-	geoIp       *geoIp
-	redisClient *redis.Client
+	geoIp          *geoIp
+	redisClient    *redis.Client
+	peerCounter    *ratecounter.RateCounter
+	torrentCounter *ratecounter.RateCounter
 }
 
 const GEOIP_DATABASE_FILENAME = "GeoLite2-Country.mmdb"
@@ -41,16 +45,38 @@ func (a *App) GetRedisClient() (*redis.Client, error) {
 	return a.redisClient, nil
 }
 
+func (a *App) GetPeerRateCounter() *ratecounter.RateCounter {
+	if a.peerCounter == nil {
+		a.peerCounter = ratecounter.NewRateCounter(1 * time.Hour)
+	}
+	return a.peerCounter
+}
+
+func (a *App) GetTorrentRateCounter() *ratecounter.RateCounter {
+	if a.torrentCounter == nil {
+		a.torrentCounter = ratecounter.NewRateCounter(1 * time.Hour)
+	}
+	return a.torrentCounter
+}
+
 func (a *App) RunUDPQueryer() {
 	infohashes := make(chan *Infohash)
 	for i := 0; i < CONCURRENT_GOROUTINES; i++ {
-		go func() {
+		go func(i int) {
+			app.Debugf("Goroutine %d", "Starting", i)
 			redisClient := GetRedisClient()
 			defer redisClient.Close()
 			for infohash := range infohashes {
-				infohash.Run(redisClient)
+				app.Tracef(
+					"Goroutine %d",
+					"Processing %s on %s",
+					i,
+					infohash.String(),
+					infohash.GetTracker().GetURL().String(),
+				)
+				infohash.Process(redisClient)
 			}
-		}()
+		}(i)
 	}
 B:
 	redisClient, err := a.GetRedisClient()
@@ -58,14 +84,7 @@ B:
 		panic(err)
 	}
 	defer redisClient.Close()
-	infohashStrs := RedisStrsCmd(
-		redisClient,
-		"ZREVRANGE",
-		"torrents",
-		"0",
-		strconv.FormatInt(CONCURRENT_GOROUTINES-1, 10),
-		"WITHSCORES",
-	)
+	infohashStrs := RedisStrsCmd(redisClient, "ZREVRANGE", "torrents", "0", "50", "WITHSCORES")
 	infohashStr := ""
 	for index, value := range infohashStrs {
 		if index%2 == 0 {
@@ -78,14 +97,19 @@ B:
 		}
 		// Set this torrent to have a zero score so it is not plucked by another
 		// worker.
-		infohash := NewInfohash(infohashStr, infohashScore)
+		infohash := ParseInfohash(infohashStr, infohashScore)
 		infohash.UpdateScoreRedisOnly(0, redisClient)
 		// Send it to the channel to be processed.
 		infohashes <- infohash
 	}
+	time.Sleep(time.Second)
 	goto B
 }
 
 func (a *App) Tracef(prefix string, message string, args ...interface{}) {
 	golog.LoggerFor(prefix).Tracef(message, args...)
+}
+
+func (a *App) Debugf(prefix string, message string, args ...interface{}) {
+	golog.LoggerFor(prefix).Debugf(message, args...)
 }

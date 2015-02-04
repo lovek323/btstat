@@ -58,10 +58,13 @@ func (p *Peer) Process(infohash *Infohash, redisClient *redis.Client) bool {
 	for _, metric := range metrics {
 		if metric.Register(p, infohash, redisClient) == PEER_NEW {
 			newIp = PEER_NEW
+			if metric.str == "users" {
+				app.GetPeerRateCounter().Incr(1)
+			}
 		}
 	}
 	elapsed := time.Since(start)
-	stathat.PostEZValue("timings.Peer.Process", "lovek323@gmail.com", elapsed.Seconds())
+	go stathat.PostEZValue("timings.Peer.Process", "lovek323@gmail.com", elapsed.Seconds())
 	return newIp
 }
 

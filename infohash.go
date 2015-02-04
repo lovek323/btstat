@@ -3,29 +3,30 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 )
 
 import "github.com/fzzy/radix/redis"
 import "github.com/stathat/go"
 
+const FIELD_TRACKER_URL = 0
+const FIELD_MAX_PEER_COUNT = 1
+const FIELD_INFOHASH = 2
+
 type Infohash struct {
-	str   string
-	score float64
+	str     string
+	score   float64
+	tracker *tracker
 }
 
-func NewInfohash(str string, score float64) *Infohash {
-	return &Infohash{str, score}
+func NewInfohash(str string, score float64, tracker *tracker) *Infohash {
+	return &Infohash{str, score, tracker}
 }
 
 func (i *Infohash) UpdateScore(modifier float64, redisClient *redis.Client) {
 	if i.score*modifier < 0.005 {
-		RedisCmd(
-			redisClient,
-			"ZREM",
-			"torrents",
-			i.str,
-		)
+		RedisCmd(redisClient, "ZREM", "torrents", i.RawString())
 		return
 	}
 	i.UpdateScoreRedisOnly(modifier, redisClient)
@@ -35,13 +36,11 @@ func (i *Infohash) UpdateScore(modifier float64, redisClient *redis.Client) {
 
 func (i *Infohash) UpdateScoreRedisOnly(modifier float64, redisClient *redis.Client) {
 	score := i.score * modifier
-	RedisCmd(
-		redisClient,
-		"ZADD",
-		"torrents",
-		strconv.FormatFloat(score, 'f', -1, 64),
-		i.str,
-	)
+	RedisCmd(redisClient, "ZADD", "torrents", fmt.Sprintf("%f", score), i.RawString())
+}
+
+func (i *Infohash) RawString() string {
+	return fmt.Sprintf("%s|%s|%s", i.tracker.url.String(), fmt.Sprintf("%d", i.tracker.maxPeerCount), i.str)
 }
 
 func (i *Infohash) String() string {
@@ -52,60 +51,14 @@ func (i *Infohash) GetScore() float64 {
 	return i.score
 }
 
-func (i *Infohash) Run(redisClient *redis.Client) {
-	trackerUrlStrs := map[string]int{
-		"udp://12.rarbg.me:80/announce":                     200,
-		"udp://9.rarbg.com:2710/announce":                   50,
-		"udp://open.demonii.com:1337/announce":              200,
-		"udp://tracker.coppersurfer.tk:6969/announce":       200,
-		"udp://tracker.leechers-paradise.org:6969/announce": 200,
-		"udp://tracker.token.ro:80/announce":                200,
-		// Not working:
-		// "udp://tracker.openbittorrent.com:80": 200,
-		// "udp://tracker.publicbt.com:80": 200,
-		// "udp://tracker.istole.it:80": 200,
-	}
-	// If a list of trackers doesn't exist (or it is empty) for
-	// this torrent, add each of the trackers to the list. These
-	// will be removed if the tracker returns out of the threshold.
-	setTrackerUrlStrs := RedisStrsCmd(
-		redisClient,
-		"SMEMBERS",
-		fmt.Sprintf("torrents.%s.trackers", i.String()),
-	)
-	app.Tracef("Infohash", "Trackers for %s: %v", i.String(), setTrackerUrlStrs)
-	var currentTrackerUrlStrs = make(
-		map[string]int,
-		len(trackerUrlStrs),
-	)
-	if len(setTrackerUrlStrs) == 0 {
-		for trackerUrlStr, _ := range trackerUrlStrs {
-			RedisCmd(
-				redisClient,
-				"SADD",
-				fmt.Sprintf("torrents.%s.trackers", i.String()),
-				trackerUrlStr,
-			)
-			currentTrackerUrlStrs[trackerUrlStr] = trackerUrlStrs[trackerUrlStr]
-		}
-		currentTrackerUrlStrs = trackerUrlStrs
-	} else {
-		for _, trackerUrlStr := range setTrackerUrlStrs {
-			currentTrackerUrlStrs[trackerUrlStr] = trackerUrlStrs[trackerUrlStr]
-		}
-	}
-	for trackerUrlStr, maxPeerCount := range currentTrackerUrlStrs {
-		tracker, err := NewTracker(trackerUrlStr, maxPeerCount)
-		if err != nil {
-			panic(err)
-		}
-		tracker.Process(i, redisClient)
-	}
-	if RedisCmd(
-		redisClient,
-		"GET",
-		fmt.Sprintf("torrents.%s.processed", i.String()),
-	).Type == redis.NilReply {
+func (i *Infohash) GetTracker() *tracker {
+	return i.tracker
+}
+
+func (i *Infohash) Process(redisClient *redis.Client) {
+	i.GetTracker().Process(i, redisClient)
+	reply := RedisCmd(redisClient, "GET", fmt.Sprintf("torrents.%s.processed", i.RawString()))
+	if reply.Type == redis.NilReply {
 		RedisCmd(
 			redisClient,
 			"SETEX",
@@ -115,10 +68,27 @@ func (i *Infohash) Run(redisClient *redis.Client) {
 		)
 		// This torrent has already been recorded as being processed
 		// within the last hour.
-		stathat.PostEZCount(
-			"torrents.processed",
-			"lovek323@gmail.com",
-			1,
-		)
+		app.GetTorrentRateCounter().Incr(1)
+		go stathat.PostEZCount("torrents.processed", "lovek323@gmail.com", 1)
 	}
+}
+
+func ParseInfohash(raw string, score float64) *Infohash {
+	fields := strings.Split(raw, "|")
+	maxPeerCount, err := strconv.ParseInt(fields[FIELD_MAX_PEER_COUNT], 10, 32)
+	if err != nil {
+		app.Debugf(
+			"ParseInfohash()",
+			"Could not parse %s as an integer (original: %s)",
+			fields[FIELD_MAX_PEER_COUNT],
+			raw,
+		)
+		// Set to some sane default value
+		maxPeerCount = 50
+	}
+	tracker, err := NewTracker(fields[FIELD_TRACKER_URL], int(maxPeerCount))
+	if err != nil {
+		panic(err)
+	}
+	return NewInfohash(fields[FIELD_INFOHASH], score, tracker)
 }

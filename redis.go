@@ -21,7 +21,7 @@ func RedisIntCmd(
 	command string,
 	args ...string,
 ) int {
-	app.Tracef("Redis", "Executing command; %s %s", command, strings.Join(args, " "))
+	app.Tracef("RedisIntCmd()", "Executing command: %s %s", command, strings.Join(args, " "))
 	argsIface := make([]interface{}, len(args))
 	for index, arg := range args {
 		argsIface[index] = interface{}(arg)
@@ -58,7 +58,7 @@ func RedisStrCmd(
 	command string,
 	args ...string,
 ) string {
-	app.Tracef("Redis", "Executing command; %s %s", command, strings.Join(args, " "))
+	app.Tracef("RedisStrCmd()", "Executing command: %s %s", command, strings.Join(args, " "))
 	argsIface := make([]interface{}, len(args))
 	for index, arg := range args {
 		argsIface[index] = interface{}(arg)
@@ -85,7 +85,7 @@ func RedisStrsCmd(
 	command string,
 	args ...string,
 ) []string {
-	app.Tracef("Redis", "Executing command; %s %s", command, strings.Join(args, " "))
+	app.Tracef("RedisStrsCmd()", "Executing command: %s %s", command, strings.Join(args, " "))
 	argsIface := make([]interface{}, len(args))
 	for index, arg := range args {
 		argsIface[index] = interface{}(arg)
@@ -131,7 +131,7 @@ func RedisCmd(
 	command string,
 	args ...string,
 ) *redis.Reply {
-	app.Tracef("Redis", "Executing command; %s %s", command, strings.Join(args, " "))
+	app.Tracef("RedisCmd()", "Executing command: %s %s", command, strings.Join(args, " "))
 	argsIface := make([]interface{}, len(args))
 	for index, arg := range args {
 		argsIface[index] = interface{}(arg)

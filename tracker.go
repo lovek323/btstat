@@ -342,10 +342,11 @@ func (t *tracker) getUDPScrapeResponse(infoHashStr string) (
 }
 
 func (t *tracker) Process(infohash *Infohash, redisClient *redis.Client) {
+	app.Debugf("Tracker.Process()", "Processing %s", infohash.RawString())
 	response, err := t.query(infohash.String())
-
 	if err != nil {
-		stathat.PostEZCount("errors.query-udp-tracker", "lovek323@gmail.com", 1)
+		app.Debugf("Tracker.Process()", "Error querying %s: %s", infohash.GetTracker().GetURL().String(), err)
+		go stathat.PostEZCount("errors.query-udp-tracker", "lovek323@gmail.com", 1)
 		RedisCmd(
 			redisClient,
 			"SREM",
@@ -355,12 +356,10 @@ func (t *tracker) Process(infohash *Infohash, redisClient *redis.Client) {
 		infohash.UpdateScore(0.5, redisClient)
 		return
 	}
-
 	peers, err := ParsePeers(response.Peers)
 	if err != nil {
 		panic(err)
 	}
-
 	if len(peers) == 0 {
 		RedisCmd(
 			redisClient,
@@ -376,7 +375,6 @@ func (t *tracker) Process(infohash *Infohash, redisClient *redis.Client) {
 			newPeers++
 		}
 	}
-
 	var scoreModifier float64
 	peerThreshold := int(float64(t.maxPeerCount) * float64(TORRENT_MAX_PEER_THRESHOLD))
 	hasMaxPeers := len(peers) >= t.maxPeerCount
@@ -393,15 +391,19 @@ func (t *tracker) Process(infohash *Infohash, redisClient *redis.Client) {
 		scoreModifier = 0.8
 	}
 	infohash.UpdateScore(scoreModifier, redisClient)
-
 	if newPeers > 0 {
 		log.Printf(
-			"P: %03d/%03d H: %s S: %e T: %s\n",
+			"P: %03d/%03d H: %s S: %e [%d torrents/hr] [%d peers/hr]\n",
 			newPeers,
 			len(peers),
 			infohash.String(),
 			infohash.GetScore(),
-			t.url.String(),
+			app.GetTorrentRateCounter().Rate(),
+			app.GetPeerRateCounter().Rate(),
 		)
 	}
+}
+
+func (t *tracker) GetURL() *url.URL {
+	return t.url
 }
