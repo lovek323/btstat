@@ -50,13 +50,15 @@ func (m *Metric) Register(
 		panic(err)
 	}
 
-	if RedisCmd(
+	reply, err := RedisCmd(
 		redisClient,
 		"GET",
 		fmt.Sprintf("%s.%s", metricStr, peer.GetIP().String()),
-	).Type != redis.NilReply {
-		// This IP address has been recorded against this metric in the last 30
-		// days, don't record it again.
+	)
+	if err != nil || reply.Type != redis.NilReply {
+		// Could not determine if this was a new IP or not or this IP address
+		// has been recorded against this metric in the last 30 days, don't
+		// record it again.
 		return PEER_EXISTING
 	}
 

@@ -84,7 +84,10 @@ B:
 		panic(err)
 	}
 	defer redisClient.Close()
-	infohashStrs := RedisStrsCmd(redisClient, "ZREVRANGE", "torrents", "0", "50", "WITHSCORES")
+	infohashStrs, err := RedisStrsCmd(redisClient, "ZREVRANGE", "torrents", "0", "50", "WITHSCORES")
+	if err != nil {
+		panic(err)
+	}
 	infohashStr := ""
 	for index, value := range infohashStrs {
 		if index%2 == 0 {

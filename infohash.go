@@ -57,7 +57,10 @@ func (i *Infohash) GetTracker() *tracker {
 
 func (i *Infohash) Process(redisClient *redis.Client) {
 	i.GetTracker().Process(i, redisClient)
-	reply := RedisCmd(redisClient, "GET", fmt.Sprintf("torrents.%s.processed", i.RawString()))
+	reply, err := RedisCmd(redisClient, "GET", fmt.Sprintf("torrents.%s.processed", i.RawString()))
+	if err != nil {
+		return
+	}
 	if reply.Type == redis.NilReply {
 		RedisCmd(
 			redisClient,

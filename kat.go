@@ -84,13 +84,16 @@ func ProcessLatestKatEntries() {
 		)
 		RedisCmd(redisClient, "HSET", fmt.Sprintf("torrents.info.%s", entry.Infohash.String()), "uri", entry.Uri)
 	}
-	torrentCount := RedisIntCmd(
+	torrentCount, err := RedisIntCmd(
 		redisClient,
 		"ZCOUNT",
 		"torrents",
 		"-inf",
 		"+inf",
 	)
+	if err != nil {
+		panic(err)
+	}
 	redisClient.Cmd("SET", "torrents.count", torrentCount)
 	stathat.PostEZValue("torrents.count", "lovek323@gmail.com", float64(torrentCount))
 }
