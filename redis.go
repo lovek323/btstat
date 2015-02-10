@@ -9,7 +9,7 @@ import "github.com/fzzy/radix/redis"
 
 func GetRedisClient() *redis.Client {
 	app.Tracef("Redis::NewRedis()", "Opening new redis connection")
-	redisClient, err := redis.Dial("tcp", "localhost:6379")
+	redisClient, err := redis.Dial("tcp", "redis1.btstat.internal:6379")
 	if err != nil {
 		log.Fatalf("Could not connect to redis: %s\n", err)
 	}

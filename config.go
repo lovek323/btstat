@@ -14,6 +14,7 @@ type Config struct {
     Kat struct {
         Categories []string
     }
+    RedisServer string
 }
 
 func GetConfig() Config {

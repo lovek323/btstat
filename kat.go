@@ -18,7 +18,7 @@ type KatEntry struct {
 	Uri      string
 }
 
-const KAT_HOURLY_URL = "https://kickass.so/hourlydump.txt.gz"
+const KAT_HOURLY_URL = "https://kickass.to/hourlydump.txt.gz"
 
 func GetLatestKatEntries() []KatEntry {
 	trackerUrlStrs := map[string]int{

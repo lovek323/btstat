@@ -36,7 +36,7 @@ func (a *App) GetGeoIP() (*geoIp, error) {
 
 func (a *App) GetRedisClient() (*redis.Client, error) {
 	if a.redisClient == nil {
-		redisClient, err := redis.Dial("tcp", "localhost:6379")
+		redisClient, err := redis.Dial("tcp", "redis1.btstat.internal:6379")
 		if err != nil {
 			log.Fatalf("Could not connect to redis: %s\n", err)
 		}
